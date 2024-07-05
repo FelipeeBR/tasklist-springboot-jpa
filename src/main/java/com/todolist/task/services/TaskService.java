@@ -4,10 +4,16 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 
 import com.todolist.task.entities.Task;
 import com.todolist.task.repositories.TaskRepository;
+import com.todolist.task.services.exceptions.DatabaseException;
+import com.todolist.task.services.exceptions.ResourceNotFoundException;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class TaskService {
@@ -21,7 +27,7 @@ public class TaskService {
 	
 	public Task findById(Long id) {
 		Optional<Task> obj = repository.findById(id);
-		return obj.get();
+		return obj.orElseThrow(() -> new ResourceNotFoundException(id));
 	}
 	
 	public Task insert(Task obj) {
@@ -29,13 +35,23 @@ public class TaskService {
 	}
 	
 	public void delete(Long id) {
-		repository.deleteById(id);
+		try {
+			repository.deleteById(id);
+		} catch(EmptyResultDataAccessException e) {
+			throw new ResourceNotFoundException(id);
+		} catch(DataIntegrityViolationException e) {
+			throw new DatabaseException(e.getMessage());
+		}
 	}
 	
 	public Task update(Long id, Task obj) {
-		Task entity = repository.getReferenceById(id);
-		updateData(entity, obj);
-		return repository.save(entity);
+		try {
+			Task entity = repository.getReferenceById(id);
+			updateData(entity, obj);
+			return repository.save(entity);
+		}catch(EntityNotFoundException e) {
+			throw new ResourceNotFoundException(id);
+		}
 	}
 	
 	private void updateData(Task entity, Task obj) {
